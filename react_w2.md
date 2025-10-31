@@ -1,4 +1,3 @@
-
 ## **Day 1: useReducer, JSON-Server, Axios**
 
 ### **Beginner Tasks**
@@ -58,7 +57,7 @@ export default Counter;
    ```bash
    json-server --watch db.json --port 3001
    ```
-4. Fetch data in React:
+4. Fetch data in React (Promise .then/.catch approach):
    ```jsx
    import React, { useEffect, useState } from 'react';
 
@@ -68,7 +67,8 @@ export default Counter;
      useEffect(() => {
        fetch('http://localhost:3001/posts')
          .then((response) => response.json())
-         .then((data) => setPosts(data));
+         .then((data) => setPosts(data))
+         .catch((error) => console.error('Error fetching posts:', error));
      }, []);
 
      return (
@@ -83,12 +83,50 @@ export default Counter;
    export default PostList;
    ```
 
+4b. Fetch data in React (async/await alternative)
+```jsx
+import React, { useEffect, useState } from 'react';
+
+function PostListAsync() {
+  const [posts, setPosts] = useState([]);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        const response = await fetch('http://localhost:3001/posts');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        setPosts(data);
+      } catch (err) {
+        setError(err.message);
+        console.error('Error fetching posts:', err);
+      }
+    }
+
+    fetchPosts();
+  }, []);
+
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title} - {post.author}</li>
+      ))}
+    </ul>
+  );
+}
+
+export default PostListAsync;
+```
+
 ---
 
 ### **Intermediate Tasks**
 #### 1. **Pagination with JSON-Server**
 **Question**: Implement pagination for a list of posts fetched from JSON-Server.  
-**Solution**:
+**Solution (Promise .then):**
 ```jsx
 import React, { useEffect, useState } from 'react';
 
@@ -100,7 +138,8 @@ function PaginatedPosts() {
   useEffect(() => {
     fetch(`http://localhost:3001/posts?_page=${page}&_limit=${limit}`)
       .then((response) => response.json())
-      .then((data) => setPosts(data));
+      .then((data) => setPosts(data))
+      .catch((err) => console.error(err));
   }, [page]);
 
   return (
@@ -119,6 +158,56 @@ function PaginatedPosts() {
 export default PaginatedPosts;
 ```
 
+Alternative using async/await:
+```jsx
+import React, { useEffect, useState } from 'react';
+
+function PaginatedPostsAsync() {
+  const [posts, setPosts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState(null);
+  const limit = 5;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchPage() {
+      try {
+        const res = await fetch(`http://localhost:3001/posts?_page=${page}&_limit=${limit}`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const data = await res.json();
+        if (isMounted) setPosts(data);
+      } catch (err) {
+        if (isMounted) setError(err.message);
+        console.error(err);
+      }
+    }
+
+    fetchPage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [page]);
+
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <div>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
+      <button onClick={() => setPage(p => p + 1)}>Next</button>
+    </div>
+  );
+}
+
+export default PaginatedPostsAsync;
+```
+
 ---
 
 #### 2. **Axios for CRUD Operations**
@@ -128,7 +217,7 @@ export default PaginatedPosts;
    ```bash
    npm install axios
    ```
-2. Example:
+2. Example (using .then):
    ```jsx
    import React, { useEffect, useState } from 'react';
    import axios from 'axios';
@@ -139,17 +228,20 @@ export default PaginatedPosts;
 
      useEffect(() => {
        axios.get('http://localhost:3001/posts')
-         .then((response) => setPosts(response.data));
+         .then((response) => setPosts(response.data))
+         .catch((err) => console.error(err));
      }, []);
 
      const addPost = () => {
        axios.post('http://localhost:3001/posts', newPost)
-         .then((response) => setPosts([...posts, response.data]));
+         .then((response) => setPosts([...posts, response.data]))
+         .catch((err) => console.error(err));
      };
 
      const deletePost = (id) => {
        axios.delete(`http://localhost:3001/posts/${id}`)
-         .then(() => setPosts(posts.filter((post) => post.id !== id)));
+         .then(() => setPosts(posts.filter((post) => post.id !== id)))
+         .catch((err) => console.error(err));
      };
 
      return (
@@ -180,12 +272,91 @@ export default PaginatedPosts;
    export default PostManager;
    ```
 
+Axios with async/await alternative:
+```jsx
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+function PostManagerAsync() {
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState({ title: '', author: '' });
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchPosts() {
+      try {
+        const response = await axios.get('http://localhost:3001/posts');
+        if (!cancelled) setPosts(response.data);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+        console.error(err);
+      }
+    }
+
+    fetchPosts();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const addPost = async () => {
+    try {
+      const response = await axios.post('http://localhost:3001/posts', newPost);
+      setPosts((prev) => [...prev, response.data]);
+      setNewPost({ title: '', author: '' });
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    }
+  };
+
+  const deletePost = async (id) => {
+    try {
+      await axios.delete(`http://localhost:3001/posts/${id}`);
+      setPosts((prev) => prev.filter((post) => post.id !== id));
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    }
+  };
+
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <div>
+      <input
+        placeholder="Title"
+        value={newPost.title}
+        onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+      />
+      <input
+        placeholder="Author"
+        value={newPost.author}
+        onChange={(e) => setNewPost({ ...newPost, author: e.target.value })}
+      />
+      <button onClick={addPost}>Add Post</button>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            {post.title} - {post.author}
+            <button onClick={() => deletePost(post.id)}>Delete</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default PostManagerAsync;
+```
+
 ---
 
 ### **Advanced Tasks**
 #### 1. **useReducer with API Calls**
 **Question**: Use `useReducer` to manage the state of API calls (loading, success, error).  
-**Solution**:
+**Solution (using axios with .then/.catch):**
 ```jsx
 import React, { useReducer, useEffect } from 'react';
 import axios from 'axios';
@@ -221,6 +392,55 @@ function PostList() {
 }
 
 export default PostList;
+```
+
+Alternative using async/await inside useEffect:
+```jsx
+import React, { useReducer, useEffect } from 'react';
+import axios from 'axios';
+
+const initialState = { loading: true, data: [], error: '' };
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'FETCH_SUCCESS':
+      return { loading: false, data: action.payload, error: '' };
+    case 'FETCH_ERROR':
+      return { loading: false, data: [], error: action.payload || 'Something went wrong!' };
+    default:
+      return state;
+  }
+}
+
+function PostListAsync() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchData() {
+      try {
+        const response = await axios.get('http://localhost:3001/posts');
+        if (!cancelled) dispatch({ type: 'FETCH_SUCCESS', payload: response.data });
+      } catch (err) {
+        if (!cancelled) dispatch({ type: 'FETCH_ERROR', payload: err.message });
+      }
+    }
+
+    fetchData();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div>
+      {state.loading ? 'Loading...' : state.data.map((post) => <div key={post.id}>{post.title}</div>)}
+      {state.error && <p>{state.error}</p>}
+    </div>
+  );
+}
+
+export default PostListAsync;
 ```
 
 ---
@@ -274,7 +494,7 @@ export default App;
 ### **Intermediate Tasks**
 #### 1. **Custom Hook for Fetching Data**
 **Question**: Create a custom hook `useFetch` to fetch data from an API.  
-**Solution**:
+**Solution (Promise .then):**
 ```jsx
 import { useState, useEffect } from 'react';
 
@@ -287,6 +507,10 @@ function useFetch(url) {
       .then((response) => response.json())
       .then((data) => {
         setData(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
         setLoading(false);
       });
   }, [url]);
@@ -309,6 +533,62 @@ function PostList() {
 }
 
 export default PostList;
+```
+
+Alternative custom hook using async/await and fetch:
+```jsx
+import { useState, useEffect } from 'react';
+
+function useFetchAsync(url) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchData() {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const json = await res.json();
+        if (!cancelled) {
+          setData(json);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message);
+          setLoading(false);
+        }
+        console.error(err);
+      }
+    }
+
+    fetchData();
+
+    return () => { cancelled = true; };
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+function PostListAsyncHook() {
+  const { data, loading, error } = useFetchAsync('http://localhost:3001/posts');
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <ul>
+      {data.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  );
+}
+
+export default PostListAsyncHook;
 ```
 
 ---
