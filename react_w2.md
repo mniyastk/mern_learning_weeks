@@ -800,6 +800,70 @@ function App() {
 export default App;
 ```
 
++
+#### 2. **Dynamic Routing (Route Params)**
+**Question**: Create routes that accept dynamic parameters (for example, viewing a post by id) and show how to use `useParams` and linking to dynamic routes.
+**Solution**:
+```jsx
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useParams } from 'react-router-dom';
+
+// Example list page that links to dynamic routes
+function PostsList() {
+  // In a real app you'd fetch this from an API
+  const posts = [
+    { id: 1, title: 'Post One' },
+    { id: 2, title: 'Post Two' },
+    { id: 3, title: 'Post Three' },
+  ];
+
+  return (
+    <div>
+      <h1>Posts</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            <Link to={`/posts/${post.id}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Detail page that reads the :id param
+function PostDetail() {
+  const { id } = useParams();
+
+  // You can fetch the post by id here (e.g. fetch(`/posts/${id}`))
+  // For demo we just show the id
+  return (
+    <div>
+      <h2>Post Detail</h2>
+      <p>Showing details for post with id: {id}</p>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <nav>
+        <Link to="/">Home</Link>
+        <Link to="/posts">Posts</Link>
+      </nav>
+      <Routes>
+        <Route path="/" element={<h1>Home</h1>} />
+        <Route path="/posts" element={<PostsList />} />
+        <Route path="/posts/:id" element={<PostDetail />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
+```
+
 ---
 
 ### **Advanced Tasks**
